@@ -18,14 +18,14 @@ func getDSNFromEnv() string {
 	return fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable", host, user, password, dbname, port)
 }
 
-var DB *gorm.DB
+var DataBase *gorm.DB
 
 func ConnectDB() error {
-
 	var err error
 
 	cfg := &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
+		Logger:                                   logger.Default.LogMode(logger.Info),
+		DisableForeignKeyConstraintWhenMigrating: true,
 	}
 
 	dsn := getDSNFromEnv()
@@ -35,22 +35,34 @@ func ConnectDB() error {
 		return err
 	}
 
-	// Run AutoMigrate for all models
-	db.AutoMigrate(
+	// Only migrate Restaurant table on app startup
+	err = db.AutoMigrate(
 		&User{},
-		&Restaurant{},
 		&Branch{},
-		&Table{},
+		&Customer{},
+		&Inventory{},
+		&MenuCategory{},
 		&MenuItem{},
+		&Notification{},
 		&Order{},
 		&OrderItem{},
-		&Inventory{},
+		&Payment{},
+		&QRSession{},
+		&QRCartItem{}, // Added missing model
+		&QRCodeScan{}, // Added missing model
+		&Reservation{},
+		&Supplier{},
+		&Table{},
 	)
+	if err != nil {
+		return fmt.Errorf("failed to migrate Restaurant table: %w", err)
+	}
 
-	// Optionally, assign db to a package-level variable if needed
-	DB = db
+	// Assign db to package-level variable
+	DataBase = db
 
 	fmt.Println("Database connection established successfully")
-
+	fmt.Println("Restaurant table migrated successfully")
+	// Automatically migrate all other tables
 	return nil
 }

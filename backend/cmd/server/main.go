@@ -4,10 +4,16 @@ import (
 	"fmt"
 	"log"
 
+	"restaurant_os/internal/models"
+	"restaurant_os/internal/routes"
+
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
+	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/monitor"
-	"github.com/hazitgi/restaurant_os/internal/models"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
 
 	"github.com/lpernett/godotenv"
 )
@@ -32,16 +38,24 @@ func main() {
 		log.Fatalf("Error connecting to the database: %v", err)
 	}
 
-
 	app := fiber.New(fiber.Config{
 		ServerHeader:  "Restaurant OS",
 		AppName:       "Restaurant OS v0.1",
 		CaseSensitive: true,
 	})
+	// Global middleware
+	app.Use(logger.New())
+	app.Use(recover.New())
+	app.Use(requestid.New())
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "*",
+		AllowMethods: "GET,POST,PUT,DELETE,PATCH,OPTIONS",
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+	}))
 
 	app.Use(healthcheck.New())
 	app.Get("/monitor", monitor.New(monitor.Config{
-		Title:       "Restaurant OS Monitor",
+		Title: "Restaurant OS Monitor",
 	}))
 
 	app.Get("/", func(ctx *fiber.Ctx) error {
@@ -64,6 +78,8 @@ func main() {
 		ctx.Set("Content-Type", "application/graphql-response+json")
 		return ctx.JSON(result)
 	})
+
+	routes.RegisterRoutes(app)
 
 	log.Fatal(app.Listen(":5000"))
 

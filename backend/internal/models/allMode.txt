@@ -1,0 +1,518 @@
+package models
+
+import (
+    "time"
+    "gorm.io/gorm"
+)
+
+type Branch struct {
+    ID            uint           `gorm:"primaryKey"`
+    RestaurantID  uint           `gorm:"not null"`
+    Restaurant    Restaurant     `gorm:"foreignKey:RestaurantID"`
+    Name          string         `gorm:"not null;size:100"`
+    Location      string         `gorm:"type:text"`
+    Phone         string         `gorm:"size:20"`
+    Email         string         `gorm:"size:255"`
+    ManagerID     *uint          // Branch manager
+    Manager       *User          `gorm:"foreignKey:ManagerID"`
+    IsActive      bool           `gorm:"default:true"`
+    OpeningHours  string         `gorm:"type:json"` // JSON for flexible hours
+    Tables        []Table
+    MenuItems     []MenuItem
+    Orders        []Order
+    Inventory     []Inventory
+    Users         []User
+    CreatedAt     time.Time
+    UpdatedAt     time.Time
+    DeletedAt     gorm.DeletedAt `gorm:"index"`
+}
+
+type Customer struct {
+    ID           uint           `gorm:"primaryKey"`
+    Name         string         `gorm:"not null;size:100"`
+    Phone        string         `gorm:"unique;size:20"`
+    Email        string         `gorm:"size:255"`
+    Address      string         `gorm:"type:text"`
+    BirthDate    *time.Time
+    Anniversary  *time.Time
+    TotalOrders  int            `gorm:"default:0"`
+    TotalSpent   float64        `gorm:"type:decimal(10,2);default:0"`
+    LoyaltyPoints int           `gorm:"default:0"`
+    Notes        string         `gorm:"type:text"`
+    CreatedAt    time.Time
+    UpdatedAt    time.Time
+    DeletedAt    gorm.DeletedAt `gorm:"index"`
+}
+
+
+
+type InventoryUnit string
+
+const (
+    UnitKG     InventoryUnit = "KG"
+    UnitGram   InventoryUnit = "GRAM"
+    UnitLiter  InventoryUnit = "LITER"
+    UnitML     InventoryUnit = "ML"
+    UnitPiece  InventoryUnit = "PIECE"
+    UnitPack   InventoryUnit = "PACK"
+    UnitBottle InventoryUnit = "BOTTLE"
+)
+
+type Inventory struct {
+    ID           uint           `gorm:"primaryKey"`
+    BranchID     uint           `gorm:"not null"`
+    Branch       Branch         `gorm:"foreignKey:BranchID"`
+    ItemName     string         `gorm:"not null;size:100"`
+    ItemCode     string         `gorm:"size:50"` // SKU or item code
+    Category     string         `gorm:"size:50"`
+    Unit         InventoryUnit  `gorm:"type:VARCHAR(20);not null"`
+    CurrentStock float64        `gorm:"type:decimal(10,3);default:0"`
+    ReorderLevel float64        `gorm:"type:decimal(10,3);default:0"`
+    MaxLevel     float64        `gorm:"type:decimal(10,3);default:0"`
+    UnitCost     float64        `gorm:"type:decimal(10,2);default:0"`
+    SupplierName string         `gorm:"size:100"`
+    LastOrdered  *time.Time
+    ExpiryDate   *time.Time
+    CreatedAt    time.Time
+    UpdatedAt    time.Time
+    DeletedAt    gorm.DeletedAt `gorm:"index"`
+}
+
+
+type MenuCategory struct {
+	ID          uint       `gorm:"primaryKey"`
+	BranchID    uint       `gorm:"not null"`
+	Branch      Branch     `gorm:"foreignKey:BranchID"`
+	Name        string     `gorm:"not null;size:100"`
+	Description string     `gorm:"type:text"`
+	SortOrder   int        `gorm:"default:0"`
+	IsActive    bool       `gorm:"default:true"`
+	MenuItems   []MenuItem     `gorm:"foreignKey:CategoryID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   gorm.DeletedAt `gorm:"index"`
+}
+
+type MenuItem struct {
+    ID           uint           `gorm:"primaryKey"`
+    BranchID     uint           `gorm:"not null"`
+    Branch       Branch         `gorm:"foreignKey:BranchID"`
+    CategoryID   *uint
+    Category     *MenuCategory  `gorm:"foreignKey:CategoryID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+    Name         string         `gorm:"not null;size:100"`
+    Description  string         `gorm:"type:text"`
+    Price        float64        `gorm:"not null;type:decimal(10,2)"`
+    CostPrice    float64        `gorm:"type:decimal(10,2)"` // For profit calculation
+    Available    bool           `gorm:"default:true"`
+    IsVegetarian bool           `gorm:"default:false"`
+    IsVegan      bool           `gorm:"default:false"`
+    IsGlutenFree bool           `gorm:"default:false"`
+    Spiciness    int            `gorm:"default:0"` // 0-5 scale
+    PrepTime     int            `gorm:"default:15"` // minutes
+    ImageURL     string         `gorm:"size:500"`
+    Ingredients  string         `gorm:"type:text"` // JSON or comma-separated
+    Allergens    string         `gorm:"type:text"` // JSON or comma-separated
+    SortOrder    int            `gorm:"default:0"`
+    CreatedAt    time.Time
+    UpdatedAt    time.Time
+    DeletedAt    gorm.DeletedAt `gorm:"index"`
+}
+
+
+type NotificationType string
+type NotificationStatus string
+
+const (
+	NotificationNewOrder       NotificationType = "NEW_ORDER"
+	NotificationOrderReady     NotificationType = "ORDER_READY"
+	NotificationPaymentPending NotificationType = "PAYMENT_PENDING"
+	NotificationQRSession      NotificationType = "QR_SESSION"
+	NotificationInventoryLow   NotificationType = "INVENTORY_LOW"
+	NotificationReservation    NotificationType = "RESERVATION"
+)
+
+const (
+	NotificationPending NotificationStatus = "PENDING"
+	NotificationSent    NotificationStatus = "SENT"
+	NotificationRead    NotificationStatus = "READ"
+	NotificationFailed  NotificationStatus = "FAILED"
+)
+
+type Notification struct {
+	ID       uint               `gorm:"primaryKey"`
+	BranchID uint               `gorm:"not null"`
+	Branch   Branch             `gorm:"foreignKey:BranchID"`
+	UserID   *uint              // Target user (null for broadcast)
+	User     *User              `gorm:"foreignKey:UserID"`
+	Type     NotificationType   `gorm:"type:VARCHAR(30);not null"`
+	Status   NotificationStatus `gorm:"type:VARCHAR(20);default:'PENDING'"`
+	Title    string             `gorm:"not null;size:200"`
+	Message  string             `gorm:"type:text;not null"`
+	Data     string             `gorm:"type:json"` // Additional data as JSON
+
+	// Reference IDs for related entities
+	OrderID     *uint
+	TableID     *uint
+	QRSessionID *uint
+
+	ReadAt    *time.Time
+	SentAt    *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+
+type OrderStatus string
+type OrderType string
+type OrderSource string
+type PaymentStatus string
+
+const (
+	OrderPending   OrderStatus = "PENDING"
+	OrderConfirmed OrderStatus = "CONFIRMED"
+	OrderPreparing OrderStatus = "PREPARING"
+	OrderReady     OrderStatus = "READY"
+	OrderServed    OrderStatus = "SERVED"
+	OrderCompleted OrderStatus = "COMPLETED"
+	OrderCancelled OrderStatus = "CANCELLED"
+	OrderRefunded  OrderStatus = "REFUNDED"
+)
+
+const (
+	OrderTypeDineIn   OrderType = "DINE_IN"
+	OrderTypeTakeaway OrderType = "TAKEAWAY"
+	OrderTypeDelivery OrderType = "DELIVERY"
+	OrderTypeOnline   OrderType = "ONLINE"
+)
+
+const (
+	OrderSourceStaff   OrderSource = "STAFF"      // Order taken by waiter/cashier
+	OrderSourceQR      OrderSource = "QR_CODE"    // Customer ordered via QR code
+	OrderSourceApp     OrderSource = "MOBILE_APP" // Customer ordered via mobile app
+	OrderSourceWebsite OrderSource = "WEBSITE"    // Customer ordered via website
+	OrderSourceKiosk   OrderSource = "KIOSK"      // Self-service kiosk
+)
+
+const (
+	PaymentPending  PaymentStatus = "PENDING"
+	PaymentPaid     PaymentStatus = "PAID"
+	PaymentPartial  PaymentStatus = "PARTIAL"
+	PaymentRefunded PaymentStatus = "REFUNDED"
+	PaymentFailed   PaymentStatus = "FAILED"
+)
+
+type Order struct {
+	ID            uint   `gorm:"primaryKey"`
+	OrderNumber   string `gorm:"unique;not null;size:50"` // Human-readable order number
+	TableID       *uint
+	Table         *Table        `gorm:"foreignKey:TableID"`
+	BranchID      uint          `gorm:"not null"`
+	Branch        Branch        `gorm:"foreignKey:BranchID"`
+	UserID        *uint         // Waiter/Cashier who placed (null for QR orders)
+	User          *User         `gorm:"foreignKey:UserID"`
+	CustomerName  string        `gorm:"size:100"`
+	CustomerPhone string        `gorm:"size:20"`
+	CustomerEmail string        `gorm:"size:255"`
+	OrderType     OrderType     `gorm:"type:VARCHAR(20);default:'DINE_IN'"`
+	OrderSource   OrderSource   `gorm:"type:VARCHAR(20);default:'STAFF'"` // How order was placed
+	Status        OrderStatus   `gorm:"type:VARCHAR(20);default:'PENDING'"`
+	PaymentStatus PaymentStatus `gorm:"type:VARCHAR(20);default:'PENDING'"`
+
+	// QR Order specific fields
+	QRSessionID *uint      // Link to QR session if applicable
+	QRSession   *QRSession `gorm:"foreignKey:QRSessionID"`
+	IsQROrder   bool       `gorm:"default:false"`
+
+	// Financial fields
+	Subtotal       float64 `gorm:"type:decimal(10,2);default:0"`
+	TaxAmount      float64 `gorm:"type:decimal(10,2);default:0"`
+	DiscountAmount float64 `gorm:"type:decimal(10,2);default:0"`
+	ServiceCharge  float64 `gorm:"type:decimal(10,2);default:0"`
+	Total          float64 `gorm:"type:decimal(10,2);default:0"`
+
+	Notes         string `gorm:"type:text"`
+	EstimatedTime int    `gorm:"default:0"` // minutes
+	OrderItems    []OrderItem
+	Payments      []Payment
+
+	// Staff assignment for QR orders
+	AssignedWaiterID *uint // Waiter assigned to serve this QR order
+	AssignedWaiter   *User `gorm:"foreignKey:AssignedWaiterID"`
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index"`
+}
+
+
+type OrderItemStatus string
+
+const (
+	OrderItemPending   OrderItemStatus = "PENDING"
+	OrderItemPreparing OrderItemStatus = "PREPARING"
+	OrderItemReady     OrderItemStatus = "READY"
+	OrderItemServed    OrderItemStatus = "SERVED"
+	OrderItemCancelled OrderItemStatus = "CANCELLED"
+)
+
+type OrderItem struct {
+	ID         uint            `gorm:"primaryKey"`
+	OrderID    uint            `gorm:"not null"`
+	Order      Order           `gorm:"foreignKey:OrderID"`
+	MenuItemID uint            `gorm:"not null"`
+	MenuItem   MenuItem        `gorm:"foreignKey:MenuItemID"`
+	Quantity   int             `gorm:"not null;default:1"`
+	UnitPrice  float64         `gorm:"type:decimal(10,2);not null"`
+	TotalPrice float64         `gorm:"type:decimal(10,2);not null"`
+	Status     OrderItemStatus `gorm:"type:VARCHAR(20);default:'PENDING'"`
+	Notes      string          `gorm:"type:text"`
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
+
+type PaymentMethod string
+
+const (
+	PaymentCash       PaymentMethod = "CASH"
+	PaymentCard       PaymentMethod = "CARD"
+	PaymentUPI        PaymentMethod = "UPI"
+	PaymentWallet     PaymentMethod = "WALLET"
+	PaymentNetBanking PaymentMethod = "NET_BANKING"
+)
+
+type Payment struct {
+	ID              uint          `gorm:"primaryKey"`
+	OrderID         uint          `gorm:"not null"`
+	Order           Order         `gorm:"foreignKey:OrderID"`
+	Amount          float64       `gorm:"type:decimal(10,2);not null"`
+	Method          PaymentMethod `gorm:"type:VARCHAR(20);not null"`
+	Status          PaymentStatus `gorm:"type:VARCHAR(20);default:'PENDING'"`
+	TransactionID   string        `gorm:"size:100"` // For digital payments
+	Reference       string        `gorm:"size:100"`
+	ProcessedBy     *uint         // User who processed
+	ProcessedByUser *User         `gorm:"foreignKey:ProcessedBy"`
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+
+type QRSessionStatus string
+
+const (
+	QRSessionActive    QRSessionStatus = "ACTIVE"
+	QRSessionCompleted QRSessionStatus = "COMPLETED"
+	QRSessionExpired   QRSessionStatus = "EXPIRED"
+	QRSessionAbandoned QRSessionStatus = "ABANDONED"
+)
+
+type QRSession struct {
+	ID            uint            `gorm:"primaryKey"`
+	SessionToken  string          `gorm:"unique;not null;size:255"` // Unique session token
+	TableID       uint            `gorm:"not null"`
+	Table         Table           `gorm:"foreignKey:TableID"`
+	BranchID      uint            `gorm:"not null"`
+	Branch        Branch          `gorm:"foreignKey:BranchID"`
+	CustomerName  string          `gorm:"size:100"`
+	CustomerPhone string          `gorm:"size:20"`
+	CustomerEmail string          `gorm:"size:255"`
+	GuestCount    int             `gorm:"default:1"`
+	Status        QRSessionStatus `gorm:"type:VARCHAR(20);default:'ACTIVE'"`
+
+	// Session management
+	StartedAt      time.Time `gorm:"not null"`
+	LastActivityAt time.Time `gorm:"not null"`
+	ExpiresAt      time.Time `gorm:"not null"` // Session expiry time
+
+	// Cart functionality for QR orders
+	CartItems []QRCartItem // Items in cart before order placement
+	Orders    []Order      // Orders placed in this session
+
+	// Device information
+	DeviceInfo string `gorm:"type:text"` // JSON with device/browser info
+	IPAddress  string `gorm:"size:45"`   // IPv4 or IPv6
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index"`
+}
+
+// QR Cart Item model (new) - for cart functionality in QR ordering
+type QRCartItem struct {
+	ID          uint      `gorm:"primaryKey"`
+	QRSessionID uint      `gorm:"not null"`
+	QRSession   QRSession `gorm:"foreignKey:QRSessionID"`
+	MenuItemID  uint      `gorm:"not null"`
+	MenuItem    MenuItem  `gorm:"foreignKey:MenuItemID"`
+	Quantity    int       `gorm:"not null;default:1"`
+	UnitPrice   float64   `gorm:"type:decimal(10,2);not null"`
+	TotalPrice  float64   `gorm:"type:decimal(10,2);not null"`
+	Notes       string    `gorm:"type:text"` // Special instructions
+	AddedAt     time.Time `gorm:"not null"`
+	UpdatedAt   time.Time
+}
+
+// QR Code Analytics model (new) - for tracking QR code usage
+type QRCodeScan struct {
+	ID          uint       `gorm:"primaryKey"`
+	TableID     uint       `gorm:"not null"`
+	Table       Table      `gorm:"foreignKey:TableID"`
+	BranchID    uint       `gorm:"not null"`
+	Branch      Branch     `gorm:"foreignKey:BranchID"`
+	QRSessionID *uint      // If scan led to a session
+	QRSession   *QRSession `gorm:"foreignKey:QRSessionID"`
+
+	// Analytics data
+	IPAddress  string    `gorm:"size:45"`
+	UserAgent  string    `gorm:"type:text"`
+	DeviceType string    `gorm:"size:50"` // mobile, tablet, desktop
+	ScanTime   time.Time `gorm:"not null"`
+
+	// Conversion tracking
+	ConvertedToSession bool `gorm:"default:false"`
+	ConvertedToOrder   bool `gorm:"default:false"`
+
+	CreatedAt time.Time
+}
+
+
+type ReservationStatus string
+
+const (
+	ReservationPending   ReservationStatus = "PENDING"
+	ReservationConfirmed ReservationStatus = "CONFIRMED"
+	ReservationSeated    ReservationStatus = "SEATED"
+	ReservationCompleted ReservationStatus = "COMPLETED"
+	ReservationCancelled ReservationStatus = "CANCELLED"
+	ReservationNoShow    ReservationStatus = "NO_SHOW"
+)
+
+type Reservation struct {
+	ID            uint   `gorm:"primaryKey"`
+	BranchID      uint   `gorm:"not null"`
+	Branch        Branch `gorm:"foreignKey:BranchID"`
+	TableID       *uint
+	Table         *Table            `gorm:"foreignKey:TableID"`
+	CustomerName  string            `gorm:"not null;size:100"`
+	CustomerPhone string            `gorm:"not null;size:20"`
+	CustomerEmail string            `gorm:"size:255"`
+	GuestCount    int               `gorm:"not null;default:1"`
+	ReservedDate  time.Time         `gorm:"not null"`
+	ReservedTime  time.Time         `gorm:"not null"`
+	Duration      int               `gorm:"default:120"` // minutes
+	Status        ReservationStatus `gorm:"type:VARCHAR(20);default:'PENDING'"`
+	Notes         string            `gorm:"type:text"`
+	CreatedBy     *uint
+	CreatedByUser *User `gorm:"foreignKey:CreatedBy"`
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	DeletedAt     gorm.DeletedAt `gorm:"index"`
+}
+
+
+type Restaurant struct {
+    ID          uint           `gorm:"primaryKey"`
+    Name        string         `gorm:"not null;size:100"`
+    Email       string         `gorm:"unique;size:255"`
+    Phone       string         `gorm:"size:20"`
+    Address     string         `gorm:"type:text"`
+    Website     string         `gorm:"size:255"`
+    TaxNumber   string         `gorm:"size:50"`
+    Currency    string         `gorm:"size:3;default:'USD'"` // ISO currency code
+    TimeZone    string         `gorm:"size:50;default:'UTC'"`
+    IsActive    bool           `gorm:"default:true"`
+    Branches    []Branch
+    Users       []User
+    CreatedAt   time.Time
+    UpdatedAt   time.Time
+    DeletedAt   gorm.DeletedAt `gorm:"index"`
+}
+
+
+type Supplier struct {
+    ID        uint           `gorm:"primaryKey"`
+    Name      string         `gorm:"not null;size:100"`
+    Contact   string         `gorm:"size:100"`
+    Phone     string         `gorm:"size:20"`
+    Email     string         `gorm:"size:255"`
+    Address   string         `gorm:"type:text"`
+    IsActive  bool           `gorm:"default:true"`
+    CreatedAt time.Time
+    UpdatedAt time.Time
+    DeletedAt gorm.DeletedAt `gorm:"index"`
+}
+
+
+type TableStatus string
+
+const (
+    TableAvailable TableStatus = "AVAILABLE"
+    TableOccupied  TableStatus = "OCCUPIED"
+    TableReserved  TableStatus = "RESERVED"
+    TableCleaning  TableStatus = "CLEANING"
+    TableBlocked   TableStatus = "BLOCKED"
+)
+
+type Table struct {
+    ID           uint           `gorm:"primaryKey"`
+    Number       string         `gorm:"not null;size:20"`
+    BranchID     uint           `gorm:"not null"`
+    Branch       Branch         `gorm:"foreignKey:BranchID"`
+    Capacity     int            `gorm:"not null;default:4"`
+    Status       TableStatus    `gorm:"type:VARCHAR(20);default:'AVAILABLE'"`
+    Location     string         `gorm:"size:100"` // e.g., "Window side", "Corner"
+    QRCode       string         `gorm:"unique;size:255"` // Unique QR code for table
+    QRToken      string         `gorm:"unique;size:255"` // Token for QR code authentication
+    QRMenuURL    string         `gorm:"size:500"` // Direct URL to QR menu for this table
+    IsQRActive   bool           `gorm:"default:true"` // Enable/disable QR ordering for table
+    Orders       []Order
+    Reservations []Reservation
+    QRSessions   []QRSession   // Active QR ordering sessions
+    CreatedAt    time.Time
+    UpdatedAt    time.Time
+    DeletedAt    gorm.DeletedAt `gorm:"index"`
+}
+
+
+// User Types
+type UserType string
+
+const (
+    UserTypeSuperAdmin UserType = "SUPER_ADMIN"
+    UserTypeRestaurant UserType = "RESTAURANT"
+    UserTypeEmployee   UserType = "EMPLOYEE"
+)
+
+// Employee Roles
+type EmployeeRole string
+
+const (
+    RoleWaiter   EmployeeRole = "WAITER"
+    RoleChef     EmployeeRole = "CHEF"
+    RoleCashier  EmployeeRole = "CASHIER"
+    RoleManager  EmployeeRole = "MANAGER"
+    RoleKitchen  EmployeeRole = "KITCHEN_STAFF"
+    RoleHost     EmployeeRole = "HOST"
+)
+
+// User model with enhanced fields
+type User struct {
+    ID           uint           `gorm:"primaryKey"`
+    Name         string         `gorm:"not null;size:100"`
+    Email        string         `gorm:"unique;not null;size:255"`
+    Password     string         `gorm:"not null;size:255"`
+    Phone        string         `gorm:"size:20"`
+    UserType     UserType       `gorm:"type:VARCHAR(20);not null"`
+    Role         *EmployeeRole  `gorm:"type:VARCHAR(20)"`
+    RestaurantID *uint          
+    Restaurant   *Restaurant    `gorm:"foreignKey:RestaurantID"`
+    BranchID     *uint          
+    Branch       *Branch        `gorm:"foreignKey:BranchID"`
+    Access       string         `gorm:"type:text"`
+    IsActive     bool           `gorm:"default:true"`
+    LastLogin    *time.Time
+    CreatedBy    *uint
+    CreatedAt    time.Time
+    UpdatedAt    time.Time
+    DeletedAt    gorm.DeletedAt `gorm:"index"`
+}
