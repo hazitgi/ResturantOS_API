@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 
+	"restaurant_os/internal/config"
+	"restaurant_os/internal/dto"
 	"restaurant_os/internal/models"
 	"restaurant_os/internal/routes"
 
@@ -14,8 +16,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
-
-	"github.com/lpernett/godotenv"
 )
 
 type User struct {
@@ -24,16 +24,15 @@ type User struct {
 }
 
 func main() {
-
 	fmt.Println("Starting")
 	// Load environment variables from .env file
-	err := godotenv.Load()
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatal("Error loading .env")
 	}
 
 	// Connect to the database
-	err = models.ConnectDB()
+	err = models.ConnectDB(cfg)
 	if err != nil {
 		log.Fatalf("Error connecting to the database: %v", err)
 	}
@@ -42,6 +41,18 @@ func main() {
 		ServerHeader:  "Restaurant OS",
 		AppName:       "Restaurant OS v0.1",
 		CaseSensitive: true,
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			code := fiber.StatusInternalServerError
+			if e, ok := err.(*fiber.Error); ok {
+				code = e.Code
+			}
+			errMsg := err.Error()
+			return c.Status(code).JSON(dto.APIResponse{
+				Success: false,
+				Message: "Internal Server Error",
+				Error:   &errMsg,
+			})
+		},
 	})
 	// Global middleware
 	app.Use(logger.New())

@@ -2,40 +2,45 @@ package models
 
 import (
 	"fmt"
-	"os"
+	"restaurant_os/internal/config"
 
 	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
-func getDSNFromEnv() string {
-	host := os.Getenv("DB_HOST")
-	port := os.Getenv("DB_PORT")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASSWORD")
-	dbname := os.Getenv("DB_NAME")
-	return fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable", host, user, password, dbname, port)
+func getDSNFromConfig(cfg *config.Config) string {
+	return fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		cfg.DBHost, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBPort)
 }
 
 var DataBase *gorm.DB
 
-func ConnectDB() error {
+func ConnectDB(cfg *config.Config) error {
 	var err error
+	var db *gorm.DB
 
-	cfg := &gorm.Config{
-		Logger:                                   logger.Default.LogMode(logger.Info),
+	gormCfg := &gorm.Config{
+		Logger:                                   logger.Default.LogMode(logger.Silent),
 		DisableForeignKeyConstraintWhenMigrating: true,
 	}
 
-	dsn := getDSNFromEnv()
-	db, err := gorm.Open(postgres.Open(dsn), cfg)
-
-	if err != nil {
-		return err
+	if cfg.App_Mode == "offline" {
+		// use SQLite for offline mode
+		db, err = gorm.Open(sqlite.Open("restaurant_os.db"), gormCfg)
+		if err != nil {
+			return fmt.Errorf("failed to connect to SQLite database: %w", err)
+		}
+	} else {
+		// Use PostgreSQL for non-offline mode
+		dsn := getDSNFromConfig(cfg)
+		db, err = gorm.Open(postgres.Open(dsn), gormCfg)
+		if err != nil {
+			return err
+		}
 	}
 
-	// Only migrate Restaurant table on app startup
 	err = db.AutoMigrate(
 		&User{},
 		&Branch{},
@@ -48,21 +53,18 @@ func ConnectDB() error {
 		&OrderItem{},
 		&Payment{},
 		&QRSession{},
-		&QRCartItem{}, // Added missing model
-		&QRCodeScan{}, // Added missing model
+		&QRCartItem{},
+		&QRCodeScan{},
 		&Reservation{},
 		&Supplier{},
 		&Table{},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to migrate Restaurant table: %w", err)
+		return fmt.Errorf("failed to migrate tables: %w", err)
 	}
 
-	// Assign db to package-level variable
 	DataBase = db
 
 	fmt.Println("Database connection established successfully")
-	fmt.Println("Restaurant table migrated successfully")
-	// Automatically migrate all other tables
 	return nil
 }

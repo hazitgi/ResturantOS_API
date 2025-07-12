@@ -1,9 +1,11 @@
 package helpers
 
 import (
-	"os"
+	"fmt"
 	"restaurant_os/internal/models"
 	"time"
+
+	"restaurant_os/internal/config"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -20,12 +22,14 @@ func CheckPasswordHash(password, hash string) bool {
 }
 
 func GenerateAccessToken(user *models.User) string {
-	secret := os.Getenv("JWT_ACCESS_SECRET")
-	expiryStr := os.Getenv("JWT_ACCESS_EXPIRY")
+	secret := config.EnvConfig.JWTAccessSecret
+	expiryStr := config.EnvConfig.JWTAccessExpiry
+
 	duration := time.Hour
 	if d, err := parseDuration(expiryStr); err == nil {
 		duration = d
 	}
+	fmt.Println("user.Role", user)
 	claims := jwt.MapClaims{
 		"user_id":       user.ID,
 		"email":         user.Email,
@@ -44,15 +48,21 @@ func GenerateAccessToken(user *models.User) string {
 }
 
 func GenerateRefreshToken(user *models.User) string {
-	secret := os.Getenv("JWT_REFRESH_SECRET")
-	expiryStr := os.Getenv("JWT_REFRESH_EXPIRY")
+	secret := config.EnvConfig.JWTRefreshSecret
+	expiryStr := config.EnvConfig.JWTRefreshExpiry
+
 	duration := 7 * 24 * time.Hour
 	if d, err := parseDuration(expiryStr); err == nil {
 		duration = d
 	}
 	claims := jwt.MapClaims{
-		"user_id": user.ID,
-		"exp":     time.Now().Add(duration).Unix(),
+		"user_id":       user.ID,
+		"email":         user.Email,
+		"user_type":     user.UserType,
+		"role":          user.Role,
+		"restaurant_id": user.RestaurantID,
+		"branch_id":     user.BranchID,
+		"exp":           time.Now().Add(duration).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signedToken, err := token.SignedString([]byte(secret))

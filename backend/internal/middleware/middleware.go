@@ -1,18 +1,19 @@
 package middleware
 
 import (
+	"fmt"
+	"restaurant_os/internal/config"
 	"restaurant_os/internal/dto"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
-
-	"os"
 )
 
 func RequireAuth() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
+		fmt.Println("Authorization Header:", authHeader)
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 			errMsg := "Authorization header is missing or invalid"
 			return c.Status(fiber.StatusUnauthorized).JSON(dto.APIResponse{
@@ -32,7 +33,7 @@ func RequireAuth() fiber.Handler {
 			})
 		}
 
-		accessSecret := os.Getenv("JWT_ACCESS_SECRET")
+		accessSecret := config.EnvConfig.JWTAccessSecret
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			return []byte(accessSecret), nil // Use the actual secret from environment
 		})
@@ -81,7 +82,8 @@ func RequireAuth() fiber.Handler {
 
 func RequireRole(allowedRoles ...string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		userRole, ok := c.Locals("userRole").(string)
+		userRole, ok := c.Locals("role").(string)
+		fmt.Println("User Role from Context:", userRole)
 		if !ok {
 			errMsg := "User role not found in context"
 			return c.Status(fiber.StatusUnauthorized).JSON(dto.APIResponse{

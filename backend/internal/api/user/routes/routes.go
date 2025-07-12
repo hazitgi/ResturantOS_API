@@ -14,8 +14,9 @@ func RegisterUserRoutes(api fiber.Router) {
 
 	userHandler := user_controller.NewUserController()
 
+	// User management routes
 	users.Get("/", middleware.RequireRole("SUPER_ADMIN", "MANAGER"), userHandler.GetUsers)
-	users.Post("/", userHandler.CreateUser)
+	users.Post("/", middleware.RequireRole("SUPER_ADMIN", "MANAGER"), userHandler.CreateUser)
 	users.Get("/:id", userHandler.GetUser)
 	users.Put("/:id", middleware.RequireRole("SUPER_ADMIN", "MANAGER"), userHandler.UpdateUser)
 	users.Delete("/:id", middleware.RequireRole("SUPER_ADMIN", "MANAGER"), userHandler.DeleteUser)

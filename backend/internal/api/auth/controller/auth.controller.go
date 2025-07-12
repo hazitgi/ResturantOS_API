@@ -5,6 +5,7 @@ import (
 	auth_dto "restaurant_os/internal/api/auth/dto"
 	"restaurant_os/internal/api/auth/helpers"
 	auth_services "restaurant_os/internal/api/auth/services"
+	user_dto "restaurant_os/internal/api/user/dto"
 	dto "restaurant_os/internal/dto"
 	"restaurant_os/internal/models"
 	"time"
@@ -73,7 +74,7 @@ func (ac *authController) LoginHandler(c *fiber.Ctx) error {
 		})
 	}
 
-	userSummary := auth_dto.UserSummary{
+	userSummary := user_dto.UserSummary{
 		ID:       user.ID,
 		Email:    user.Email,
 		Name:     user.Name,
@@ -106,7 +107,7 @@ func (ac *authController) RefreshTokenHandler(c *fiber.Ctx) error {
 	response := &auth_dto.LoginResponse{
 		Token:        "newToken",
 		RefreshToken: "newRefreshToken",
-		User:         auth_dto.UserSummary{},
+		User:         user_dto.UserSummary{},
 		ExpiresAt:    time.Now().Add(time.Hour),
 	}
 
